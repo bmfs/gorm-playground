@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 )
@@ -10,48 +11,65 @@ import (
 // TEST_DRIVERS: sqlite, mysql, postgres, sqlserver
 
 type resultDTO struct {
-	Rows []*User
+	Rows []*BusinessMetric
+}
+
+type genericDTO struct {
+	Rows interface{}
 }
 
 func TestGORM(t *testing.T) {
 
-	ptLang := Language{Code: "pt", Name: "Portuguese"}
-	DB.Create(&ptLang)
-	enLang := Language{Code: "en", Name: "English"}
-	DB.Create(&enLang)
-	itLang := Language{Code: "it", Name: "Italian"}
-	DB.Create(&itLang)
+	event1 := Event{Name: "event1", Description: "event 1"}
+	DB.Create(&event1)
+	event2 := Event{Name: "event2", Description: "event 2"}
+	DB.Create(&event2)
+	event3 := Event{Name: "event3", Description: "event 3"}
+	DB.Create(&event3)
 
-	user1 := User{Name: "jinzhu", Languages: []Language{ptLang, enLang}}
-	DB.Create(&user1)
+	bm1 := BusinessMetric{Name: "bm_1", Events: []*Event{&event1, &event2}}
+	DB.Create(&bm1)
+	bm2 := BusinessMetric{Name: "bm_2", Events: []*Event{&event2, &event3}}
+	DB.Create(&bm2)
 
-	user2 := User{Name: "john", Languages: []Language{enLang, itLang}}
-	DB.Create(&user2)
-
-	var result User
-	if err := DB.First(&result, user1.ID).Error; err != nil {
+	var result BusinessMetric
+	if err := DB.First(&result, bm1.ID).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}
 
-	var result2 []User
-	if err := DB.Preload("Languages").Find(&result2).Error; err != nil {
+	var result2 []BusinessMetric
+	if err := DB.Preload("Events").Find(&result2).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}
 
-	if len(result2) <= 0 || result2[0].Languages == nil {
+	if len(result2) <= 0 || result2[0].Events == nil {
 		t.Errorf("Failed to retrieve user languages")
 	}
 
-	fmt.Println(result2[0].Languages)
+	printResult(result2)
 
-	var result3 resultDTO
-	if err := DB.Preload("Languages").Find(&result3.Rows).Error; err != nil {
+	result3 := &resultDTO{}
+	if err := DB.Preload("Events").Find(&result3.Rows).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}
 
-	if len(result2[0].Languages) != len(result3.Rows[0].Languages) {
+	if len(result2) != len(result3.Rows[0].Events) {
 		t.Error("Expected results to be the same")
 	}
-	fmt.Println(result3.Rows[0].Languages)
 
+	printResult(result3)
+
+	result4 := &genericDTO{
+		Rows: []*BusinessMetric{},
+	}
+	if err := DB.Preload("Events").Find(&result4.Rows).Error; err != nil {
+		t.Errorf("Failed, got error: %v", err)
+	}
+	printResult(result4.Rows)
+
+}
+
+func printResult(data interface{}) {
+	str, _ := json.MarshalIndent(data, "", " ")
+	fmt.Println(string(str))
 }
